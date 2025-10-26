@@ -1,7 +1,7 @@
-
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
+import dj_database_url
 import os
 
 load_dotenv()
@@ -13,13 +13,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-00-3#^6eiv$@*xw)mvvw%yysq@^uaa&x=be$$tgn^$i=q$s1qr'
+# --- CHANGED ---
+# SECRET_KEY is now read from an environment variable for security
+SECRET_KEY = os.getenv('SECRET_KEY')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# --- CHANGED ---
+# DEBUG is read from an env variable. It will be 'False' in production
+# unless you set DEBUG="True" in your .env file for local development.
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = ["*"]
+
+# --- CHANGED ---
+# Reads allowed hosts from an env variable.
+# Defaults to localhost for local development.
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES" : (
@@ -45,6 +53,9 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    # --- CHANGED ---
+    # Add WhiteNoise for serving static files
+    'whitenoise.runserver_nostatic',
     'django.contrib.staticfiles',
     'api',
     "rest_framework",
@@ -52,14 +63,20 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # --- CHANGED ---
+    # Middleware order is CRITICAL. These must be high up.
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    # --- END CHANGED ---
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+    # --- CHANGED ---
+    # 'corsheaders.middleware.CorsMiddleware', # Removed from here
 ]
 
 ROOT_URLCONF = 'backend.urls'
@@ -86,16 +103,16 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        # Fallback to a local sqlite3 db for development
+        default='sqlite:///' + os.path.join(BASE_DIR, 'db.sqlite3'),
+        conn_max_age=600
+    )
 }
 
 
 # Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
+# ... (rest of your file) ...
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -116,11 +133,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
 
@@ -129,12 +143,28 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# --- CHANGED ---
+# Added settings for WhiteNoise
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOW_ALL_ORIGINS = True
+
+# --- CHANGED ---
+# REMOVED 'CORS_ALLOW_ALL_ORIGINS = True' - this is insecure
+# and overrides the list below.
+
 CORS_ALLOW_CREDENTIALS = True
 
-
+# --- CHANGED ---
+# Read the allowed origins from an environment variable
+# Defaults to your local React app
+CORS_ALLOWED_ORIGINS = os.getenv(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:3000,http://127.0.0.1:3000'
+).split(',')
